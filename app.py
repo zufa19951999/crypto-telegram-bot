@@ -3,7 +3,8 @@ from datetime import datetime
 from threading import Thread
 from flask import Flask
 import threading
-import time  # THÊM IMPORT Ở ĐẦU FILE
+import time
+import os
 
 from telegram import Bot, Update
 from telegram.constants import ParseMode
@@ -30,9 +31,12 @@ flask_app = Flask(__name__)
 def health_check():
     return "Telegram Crypto Bot is running! (Bybit WebSocket)", 200
 
-# ==================== COMMAND HANDLERS ====================
-# ... (giữ nguyên tất cả các hàm handler của bạn) ...
+@flask_app.route('/webhook', methods=['POST'])
+def webhook():
+    """Webhook cho Telegram"""
+    return 'OK', 200
 
+# ==================== COMMAND HANDLERS ====================
 def start_command(update: Update, context: CallbackContext):
     welcome_message = """
 🚀 *Crypto Price Bot - Bybit WebSocket*
@@ -51,32 +55,6 @@ Bot này lấy giá REAL-TIME từ Bybit!
 *Ví dụ:* /xiaofa ETH
     """
     update.message.reply_text(welcome_message, parse_mode=ParseMode.MARKDOWN)
-
-def help_command(update: Update, context: CallbackContext):
-    help_text = """
-📚 *Hướng dẫn sử dụng:*
-
-1️⃣ *Kiểm tra giá:*
-   /xiaofa BTC
-   /xiaofa ETH
-   /xiaofa SOL
-
-2️⃣ *Xem nhiều coin:*
-   /prices
-
-3️⃣ *Thêm/xóa coin:*
-   /add DOGE
-   /remove DOGE
-
-4️⃣ *Danh sách theo dõi:*
-   /list
-
-5️⃣ *Thị trường:*
-   /market
-
-⚡ *Nguồn:* Bybit WebSocket Realtime
-    """
-    update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
 
 def xiaofa_command(update: Update, context: CallbackContext):
     if not context.args:
@@ -106,6 +84,32 @@ def xiaofa_command(update: Update, context: CallbackContext):
         update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
     else:
         update.message.reply_text(f"❌ Không tìm thấy coin *{symbol}*", parse_mode=ParseMode.MARKDOWN)
+
+def help_command(update: Update, context: CallbackContext):
+    help_text = """
+📚 *Hướng dẫn sử dụng:*
+
+1️⃣ *Kiểm tra giá:*
+   /xiaofa BTC
+   /xiaofa ETH
+   /xiaofa SOL
+
+2️⃣ *Xem nhiều coin:*
+   /prices
+
+3️⃣ *Thêm/xóa coin:*
+   /add DOGE
+   /remove DOGE
+
+4️⃣ *Danh sách theo dõi:*
+   /list
+
+5️⃣ *Thị trường:*
+   /market
+
+⚡ *Nguồn:* Bybit WebSocket Realtime
+    """
+    update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
 
 def prices_command(update: Update, context: CallbackContext):
     watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy())
@@ -201,14 +205,8 @@ def list_command(update: Update, context: CallbackContext):
 
 def error_handler(update: Update, context: CallbackContext):
     logger.error(f"Error: {context.error}")
-    try:
-        if update and update.message:
-            update.message.reply_text("❌ Có lỗi xảy ra, vui lòng thử lại sau.")
-    except:
-        pass
 
 # ==================== JOB FUNCTIONS ====================
-
 def periodic_price_update(context: CallbackContext):
     logger.info("📊 Đang gửi cập nhật giá...")
     coins_data = bybit_ws.get_multiple_prices(DEFAULT_COINS)
@@ -233,42 +231,49 @@ def periodic_price_update(context: CallbackContext):
             logger.error(f"Lỗi gửi tin nhắn: {e}")
 
 # ==================== MAIN ====================
-
 def run_flask():
     flask_app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
 
-def main():
-    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    
-    dp.add_handler(CommandHandler('start', start_command))
-    dp.add_handler(CommandHandler('help', help_command))
-    dp.add_handler(CommandHandler('xiaofa', xiaofa_command))
-    dp.add_handler(CommandHandler('prices', prices_command))
-    dp.add_handler(CommandHandler('market', market_command))
-    dp.add_handler(CommandHandler('add', add_command))
-    dp.add_handler(CommandHandler('remove', remove_command))
-    dp.add_handler(CommandHandler('list', list_command))
-    
-    dp.add_error_handler(error_handler)
-    
-    if updater.job_queue:
-        updater.job_queue.run_repeating(
-            periodic_price_update,
-            interval=CHECK_INTERVAL_MINUTES * 60,
-            first=10
-        )
-    
-    # FIX CHO RENDER
-    updater.start_polling(timeout=30, poll_interval=1.0)
-    logger.info("🤖 Bot đã khởi động! Dùng /xiaofa để kiểm tra giá")
-    
-    # 👉 WHILE TRUE PHẢI Ở TRONG HÀM MAIN
-    while True:
-        time.sleep(10)
+def run_bot():
+    """Chạy bot Telegram riêng biệt"""
+    try:
+        updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+        dp = updater.dispatcher
+        
+        dp.add_handler(CommandHandler('start', start_command))
+        dp.add_handler(CommandHandler('help', help_command))
+        dp.add_handler(CommandHandler('xiaofa', xiaofa_command))
+        dp.add_handler(CommandHandler('prices', prices_command))
+        dp.add_handler(CommandHandler('market', market_command))
+        dp.add_handler(CommandHandler('add', add_command))
+        dp.add_handler(CommandHandler('remove', remove_command))
+        dp.add_handler(CommandHandler('list', list_command))
+        
+        dp.add_error_handler(error_handler)
+        
+        if updater.job_queue:
+            updater.job_queue.run_repeating(
+                periodic_price_update,
+                interval=CHECK_INTERVAL_MINUTES * 60,
+                first=10
+            )
+        
+        updater.start_polling(timeout=30, poll_interval=1.0, clean=True)
+        logger.info("🤖 Bot Telegram đã khởi động thành công!")
+        
+        # Giữ bot chạy
+        while True:
+            time.sleep(10)
+            
+    except Exception as e:
+        logger.error(f"Lỗi khởi động bot: {e}")
 
 if __name__ == '__main__':
-    flask_thread = threading.Thread(target=run_flask)
+    # Chạy Flask trong thread riêng
+    flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
-    main()
+    logger.info("✅ Flask server đã khởi động")
+    
+    # Chạy bot trong thread chính
+    run_bot()
