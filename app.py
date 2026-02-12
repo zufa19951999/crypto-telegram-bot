@@ -4,7 +4,8 @@ from threading import Thread
 from flask import Flask
 import threading
 
-from telegram import Bot, Update, ParseMode
+from telegram import Bot, Update
+from telegram.constants import ParseMode
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, CHECK_INTERVAL_MINUTES, PORT, DEFAULT_COINS
