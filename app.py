@@ -5,10 +5,11 @@ from flask import Flask
 import threading
 import time
 import os
+import asyncio
 
-from telegram import Bot, Update
+from telegram import Update
 from telegram.constants import ParseMode
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, CHECK_INTERVAL_MINUTES, PORT, DEFAULT_COINS
 from utils_bybit import BybitWebSocket, format_price, format_percentage, format_number
@@ -31,13 +32,8 @@ flask_app = Flask(__name__)
 def health_check():
     return "Telegram Crypto Bot is running! (Bybit WebSocket)", 200
 
-@flask_app.route('/webhook', methods=['POST'])
-def webhook():
-    """Webhook cho Telegram"""
-    return 'OK', 200
-
 # ==================== COMMAND HANDLERS ====================
-def start_command(update: Update, context: CallbackContext):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = """
 🚀 *Crypto Price Bot - Bybit WebSocket*
 
@@ -54,15 +50,15 @@ Bot này lấy giá REAL-TIME từ Bybit!
 
 *Ví dụ:* /xiaofa ETH
     """
-    update.message.reply_text(welcome_message, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(welcome_message, parse_mode=ParseMode.MARKDOWN)
 
-def xiaofa_command(update: Update, context: CallbackContext):
+async def xiaofa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        update.message.reply_text("❌ Vui lòng nhập tên coin.\nVí dụ: /xiaofa BTC")
+        await update.message.reply_text("❌ Vui lòng nhập tên coin.\nVí dụ: /xiaofa BTC")
         return
     
     symbol = context.args[0].upper()
-    update.message.reply_text(f"🔍 Đang lấy giá *{symbol}* từ Bybit...", 
+    await update.message.reply_text(f"🔍 Đang lấy giá *{symbol}* từ Bybit...", 
                             parse_mode=ParseMode.MARKDOWN)
     
     coin_data = bybit_ws.get_price(symbol)
@@ -81,11 +77,11 @@ def xiaofa_command(update: Update, context: CallbackContext):
 ⚡ *Bybit WebSocket*
 🕐 {datetime.now().strftime('%H:%M:%S')}
         """
-        update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
     else:
-        update.message.reply_text(f"❌ Không tìm thấy coin *{symbol}*", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"❌ Không tìm thấy coin *{symbol}*", parse_mode=ParseMode.MARKDOWN)
 
-def help_command(update: Update, context: CallbackContext):
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
 📚 *Hướng dẫn sử dụng:*
 
@@ -109,11 +105,11 @@ def help_command(update: Update, context: CallbackContext):
 
 ⚡ *Nguồn:* Bybit WebSocket Realtime
     """
-    update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
 
-def prices_command(update: Update, context: CallbackContext):
-    watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy())
-    update.message.reply_text("🔄 Đang lấy giá từ Bybit...")
+async def prices_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy()) if context.user_data else DEFAULT_COINS.copy()
+    await update.message.reply_text("🔄 Đang lấy giá từ Bybit...")
     
     coins_data = bybit_ws.get_multiple_prices(watchlist)
     
@@ -126,12 +122,12 @@ def prices_command(update: Update, context: CallbackContext):
                 message += f"  {'📈 +' if change > 0 else '📉 '}{change:.2f}%\n"
             message += "\n"
         message += f"🕐 {datetime.now().strftime('%H:%M:%S')}"
-        update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
     else:
-        update.message.reply_text("❌ Không thể lấy giá")
+        await update.message.reply_text("❌ Không thể lấy giá")
 
-def market_command(update: Update, context: CallbackContext):
-    update.message.reply_text("🌍 Đang lấy dữ liệu thị trường...")
+async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🌍 Đang lấy dữ liệu thị trường...")
     
     btc_data = bybit_ws.get_price('BTC')
     eth_data = bybit_ws.get_price('ETH')
@@ -146,13 +142,13 @@ def market_command(update: Update, context: CallbackContext):
 ⚡ *WebSocket:* {'✅ Online' if bybit_ws.running else '❌ Offline'}
 🕐 {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}
         """
-        update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
     else:
-        update.message.reply_text("❌ Không thể lấy dữ liệu")
+        await update.message.reply_text("❌ Không thể lấy dữ liệu")
 
-def add_command(update: Update, context: CallbackContext):
+async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        update.message.reply_text("❌ Ví dụ: /add DOGE")
+        await update.message.reply_text("❌ Ví dụ: /add DOGE")
         return
     
     symbol = context.args[0].upper()
@@ -161,18 +157,18 @@ def add_command(update: Update, context: CallbackContext):
         context.user_data['watchlist'] = DEFAULT_COINS.copy()
     
     if symbol in context.user_data['watchlist']:
-        update.message.reply_text(f"ℹ️ *{symbol}* đã có trong danh sách", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"ℹ️ *{symbol}* đã có trong danh sách", parse_mode=ParseMode.MARKDOWN)
     else:
         test_price = bybit_ws.get_price(symbol)
         if test_price:
             context.user_data['watchlist'].append(symbol)
-            update.message.reply_text(f"✅ Đã thêm *{symbol}*", parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text(f"✅ Đã thêm *{symbol}*", parse_mode=ParseMode.MARKDOWN)
         else:
-            update.message.reply_text(f"❌ Không tìm thấy *{symbol}*", parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text(f"❌ Không tìm thấy *{symbol}*", parse_mode=ParseMode.MARKDOWN)
 
-def remove_command(update: Update, context: CallbackContext):
+async def remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        update.message.reply_text("❌ Ví dụ: /remove DOGE")
+        await update.message.reply_text("❌ Ví dụ: /remove DOGE")
         return
     
     symbol = context.args[0].upper()
@@ -182,12 +178,12 @@ def remove_command(update: Update, context: CallbackContext):
     
     if symbol in context.user_data['watchlist']:
         context.user_data['watchlist'].remove(symbol)
-        update.message.reply_text(f"✅ Đã xóa *{symbol}*", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"✅ Đã xóa *{symbol}*", parse_mode=ParseMode.MARKDOWN)
     else:
-        update.message.reply_text(f"❌ Không tìm thấy *{symbol}*", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"❌ Không tìm thấy *{symbol}*", parse_mode=ParseMode.MARKDOWN)
 
-def list_command(update: Update, context: CallbackContext):
-    watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy())
+async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy()) if context.user_data else DEFAULT_COINS.copy()
     
     if watchlist:
         message = "📋 *Danh sách theo dõi:*\n\n"
@@ -199,15 +195,12 @@ def list_command(update: Update, context: CallbackContext):
                 status = "⏳ Đang cập nhật..."
             message += f"{i}. {coin}: {status}\n"
         message += f"\n⚡ Bybit: {'✅ Online' if bybit_ws.running else '❌ Offline'}"
-        update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
     else:
-        update.message.reply_text("📋 Danh sách trống")
-
-def error_handler(update: Update, context: CallbackContext):
-    logger.error(f"Error: {context.error}")
+        await update.message.reply_text("📋 Danh sách trống")
 
 # ==================== JOB FUNCTIONS ====================
-def periodic_price_update(context: CallbackContext):
+async def periodic_price_update(context: ContextTypes.DEFAULT_TYPE):
     logger.info("📊 Đang gửi cập nhật giá...")
     coins_data = bybit_ws.get_multiple_prices(DEFAULT_COINS)
     
@@ -222,7 +215,7 @@ def periodic_price_update(context: CallbackContext):
         message += f"🕐 {datetime.now().strftime('%H:%M %d/%m/%Y')}"
         
         try:
-            context.bot.send_message(
+            await context.bot.send_message(
                 chat_id=TELEGRAM_CHAT_ID,
                 text=message,
                 parse_mode=ParseMode.MARKDOWN
@@ -235,36 +228,35 @@ def run_flask():
     flask_app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
 
 def run_bot():
-    """Chạy bot Telegram riêng biệt"""
+    """Chạy bot Telegram với python-telegram-bot v20+"""
     try:
-        updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-        dp = updater.dispatcher
+        # Tạo application
+        application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
         
-        dp.add_handler(CommandHandler('start', start_command))
-        dp.add_handler(CommandHandler('help', help_command))
-        dp.add_handler(CommandHandler('xiaofa', xiaofa_command))
-        dp.add_handler(CommandHandler('prices', prices_command))
-        dp.add_handler(CommandHandler('market', market_command))
-        dp.add_handler(CommandHandler('add', add_command))
-        dp.add_handler(CommandHandler('remove', remove_command))
-        dp.add_handler(CommandHandler('list', list_command))
+        # Add handlers
+        application.add_handler(CommandHandler('start', start_command))
+        application.add_handler(CommandHandler('help', help_command))
+        application.add_handler(CommandHandler('xiaofa', xiaofa_command))
+        application.add_handler(CommandHandler('prices', prices_command))
+        application.add_handler(CommandHandler('market', market_command))
+        application.add_handler(CommandHandler('add', add_command))
+        application.add_handler(CommandHandler('remove', remove_command))
+        application.add_handler(CommandHandler('list', list_command))
         
-        dp.add_error_handler(error_handler)
-        
-        if updater.job_queue:
-            updater.job_queue.run_repeating(
+        # Job queue
+        job_queue = application.job_queue
+        if job_queue:
+            job_queue.run_repeating(
                 periodic_price_update,
                 interval=CHECK_INTERVAL_MINUTES * 60,
                 first=10
             )
         
-        updater.start_polling(timeout=30, poll_interval=1.0, clean=True)
         logger.info("🤖 Bot Telegram đã khởi động thành công!")
         
-        # Giữ bot chạy
-        while True:
-            time.sleep(10)
-            
+        # Chạy bot (blocking)
+        application.run_polling()
+        
     except Exception as e:
         logger.error(f"Lỗi khởi động bot: {e}")
 
