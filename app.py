@@ -1,11 +1,10 @@
 import logging
 from datetime import datetime
-from threading import Thread
 from flask import Flask
-import threading
 import time
 import os
-import asyncio
+import sys
+from multiprocessing import Process
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -21,18 +20,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Khởi tạo WebSocket Bybit
+# Khởi tạo WebSocket Bybit (dùng chung)
 bybit_ws = BybitWebSocket()
 bybit_ws.start(DEFAULT_COINS)
 
-# Flask app cho Render
+# ==================== FLASK APP ====================
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def health_check():
     return "Telegram Crypto Bot is running! (Bybit WebSocket)", 200
 
-# ==================== COMMAND HANDLERS ====================
+def run_flask():
+    """Chạy Flask server riêng"""
+    flask_app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
+
+# ==================== TELEGRAM BOT HANDLERS ====================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = """
 🚀 *Crypto Price Bot - Bybit WebSocket*
@@ -199,73 +202,137 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("📋 Danh sách trống")
 
-# ==================== JOB FUNCTIONS ====================
 async def periodic_price_update(context: ContextTypes.DEFAULT_TYPE):
+    """Cập nhật giá định kỳ"""
     logger.info("📊 Đang gửi cập nhật giá...")
     coins_data = bybit_ws.get_multiple_prices(DEFAULT_COINS)
     
     if coins_data:
-        message = "🔄 *Cập nhật giá Bybit*\n\n"
-        for symbol, data in coins_data.items():
-            message += f"*{symbol}*: ${data['price']:,.2f}\n"
-            if 'price_change_24h' in data:
-                change = data['price_change_24h']
-                message += f"  {'📈 +' if change > 0 else '📉 '}{change:.2f}%\n"
-            message += "\n"
-        message += f"🕐 {datetime.now().strftime('%H:%M %d/%m/%Y')}"
+        coins_data:
+        message = message = " "🔄 *🔄 *Cập nhậtCập nhật giá By giá Bybit*\bit*\n\nn\n"
+       "
+        for symbol for symbol, data, data in coins in coins_data.items_data.items():
+           ():
+            message += message += f" f"*{*{symbol}symbol}**:: ${data ${data['price['price']:']:,.2,.2f}\f}\n"
+n"
+            if 'price_change_            if 'price24h' in_change_24h data:
+' in data:
+                change = data                change['price = data['price_change_24h_change_24h']
+                message +=']
+                f" message += f"  {'📈  {' +'📈 +' if change >  if change0 else ' > 0 else📉 ' '📉 '}{change:.2}{changef}:.2f}%\n"
+           %\n"
+            message += "\n message +="
+        "\n"
+        message += f" message += f"🕐 {datetime.now🕐 {datetime.now().str().strftime('%H:%ftime('%H:%M %M %d/%m/%d/%m/%Y')}"
         
-        try:
-            await context.bot.send_message(
-                chat_id=TELEGRAM_CHAT_ID,
-                text=message,
-                parse_mode=ParseMode.MARKDOWN
+Y')}"
+        
+        try        try:
+            await context:
+            await context.bot.bot.send_message(
+               .send_message(
+                chat_id chat_id=TE=TELEGRAMLEGRAM_CHAT_ID,
+_CHAT_ID,
+                text                text=message,
+               =message,
+                parse_mode parse_mode=Parse=ParseMode.MMode.MARKDOWN
+           ARKDOWN
             )
-        except Exception as e:
-            logger.error(f"Lỗi gửi tin nhắn: {e}")
+        )
+        except Exception as e except Exception as e:
+            logger.error:
+            logger.error(f"(f"Lỗi gLỗi gửiửi tin nh tin nhắnắn: {: {e}e}")
 
-# ==================== MAIN ====================
-def run_flask():
-    flask_app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
+#")
 
-def run_bot():
-    """Chạy bot Telegram với python-telegram-bot v20+"""
+# ==================== TE ==================== TELEGRAMLEGRAM BOT BOT ================= ====================
+===
+def rundef run_b_bot():
+    """ot():
+    """ChạChạy Telegramy Telegram bot trong bot trong process ri process riêngêng"""
+   """
     try:
+        # try:
         # Tạo application
-        application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+ Tạo        application = Application application
+        applicationBuilder(). = ApplicationBuilder().token(TELEtoken(TGRAM_BOT_TOKENELE).buildGRAM_BOT_TOKEN()
         
-        # Add handlers
-        application.add_handler(CommandHandler('start', start_command))
-        application.add_handler(CommandHandler('help', help_command))
-        application.add_handler(CommandHandler('xiaofa', xiaofa_command))
-        application.add_handler(CommandHandler('prices', prices_command))
-        application.add_handler(CommandHandler('market', market_command))
-        application.add_handler(CommandHandler('add', add_command))
-        application.add_handler(CommandHandler('remove', remove_command))
-        application.add_handler(CommandHandler('list', list_command))
+        #).build()
         
-        # Job queue
-        job_queue = application.job_queue
-        if job_queue:
-            job_queue.run_repeating(
+ Add handlers
+               # application.add Add handlers
+       _handler(CommandHandler application.add_handler(('startCommandHandler('', start_command))
+start', start        application.add_handler_command))
+        application(CommandHandler('.add_handlerhelp',(CommandHandler('help', help_command help_command))
+       ))
+        application.add application.add_handler(_handler(CommandHandlerCommandHandler('xia('xiaofa',ofa', xia xiaofa_commandofa_command))
+       ))
+        application.add application.add_handler(_handler(CommandHandlerCommandHandler('p('prices',rices', prices_command prices_command))
+       ))
+        application.add application.add_handler(_handler(CommandHandlerCommandHandler('market('market', market', market_command))
+_command))
+        application        application.add_handler.add_handler(Command(CommandHandler('Handler('add',add', add_command add_command))
+       ))
+        application.add application.add_handler(_handler(CommandHandlerCommandHandler('remove('remove', remove', remove_command))
+_command))
+        application.add_handler        application.add_handler(Command(CommandHandler('list', list_commandHandler('list', list_command))
+        
+))
+        
+        #        # Job queue
+        Job queue
+        job_queue job_queue = application = application.job.job_queue
+_queue
+        if        if job_queue job_queue:
+            job_queue:
+            job_queue.run_re.run_repeatingpeating(
+                periodic(
                 periodic_price_update,
-                interval=CHECK_INTERVAL_MINUTES * 60,
-                first=10
+               _price_update,
+                interval= interval=CHECK_INTERVALCHECK_INTERVAL_MINUTES_MINUTES * 60,
+ * 60,
+                first=10                first=10
+           
             )
         
-        logger.info("🤖 Bot Telegram đã khởi động thành công!")
+        logger )
         
-        # Chạy bot (blocking)
-        application.run_polling()
+        logger.info(".info("🤖 Bot Telegram🤖 Bot Telegram đã đã khởi động khởi động thành công!")
         
+ thành công!")
+        
+        # Chạ        #y bot Chạy bot (blocking)
+ (block        applicationing)
+.run_polling        application.run_polling(drop_pending(drop_updates_pending_updates=True)
+        
+   =True)
+ except Exception        
     except Exception as e:
-        logger.error(f"Lỗi khởi động bot: {e}")
+        as e:
+        logger.error logger.error(f"Lỗ(f"Lỗi khi khởiởi động bot động bot: {: {e}")
+e}")
+        time        time.sleep(.sleep(5)
+5)
+        #        # Th Thử lạiử lại n nếu lếu lỗiỗi
+       
+        run_b run_bot()
 
-if __name__ == '__main__':
-    # Chạy Flask trong thread riêng
-    flask_thread = Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    logger.info("✅ Flask server đã khởi động")
+ot()
+
+# =# ======================================= MAIN = MAIN ======================================
+if=
+if __name __name__ ==__ == '__main '__main__':
+   __':
+    # Ch # Chạyạy Flask trong process ri Flask trong process riêngêng
+    flask_process
+    flask_process = Process = Process(target=run_fl(target=run_flask, daemonask, daemon=True)
+=True)
+    flask_process.start    flask_process.start()
+   ()
+    logger.info logger.info("✅ Flask server đã khởi động trong process riêng")
     
-    # Chạy bot trong thread chính
+("✅ Flask server đã khởi động trong process riêng")
+    
+    # Chạy bot trong process chính
+    run    # Chạy bot trong_bot process chính
     run_bot()
