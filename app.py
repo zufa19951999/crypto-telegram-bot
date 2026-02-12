@@ -59,8 +59,7 @@ async def xiaofa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     symbol = context.args[0].upper()
-    await update.message.reply_text(f"🔍 Đang lấy giá *{symbol}* từ Bybit...", 
-                            parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(f"🔍 Đang lấy giá *{symbol}* từ Bybit...", parse_mode=ParseMode.MARKDOWN)
     
     coin_data = bybit_ws.get_price(symbol)
     
@@ -226,9 +225,9 @@ async def periodic_price_update(context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== TELEGRAM BOT ====================
 def run_bot():
-    """Chạy Telegram bot trong process riêng"""
+    """Chạy Telegram bot với python-telegram-bot v20+"""
     try:
-        # Tạo application
+        # Tạo application - KHÔNG DÙNG UPDATER
         application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
         
         # Add handlers
@@ -252,7 +251,7 @@ def run_bot():
         
         logger.info("🤖 Bot Telegram đã khởi động thành công!")
         
-        # Chạy bot
+        # Chạy bot - blocking
         application.run_polling(drop_pending_updates=True)
         
     except Exception as e:
@@ -267,5 +266,5 @@ if __name__ == '__main__':
     flask_process.start()
     logger.info("✅ Flask server đã khởi động")
     
-    # Chạy bot
+    # Chạy bot trong process chính
     run_bot()
