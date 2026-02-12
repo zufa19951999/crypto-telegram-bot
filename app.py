@@ -3,6 +3,7 @@ from datetime import datetime
 from threading import Thread
 from flask import Flask
 import threading
+import time  # THÊM IMPORT Ở ĐẦU FILE
 
 from telegram import Bot, Update
 from telegram.constants import ParseMode
@@ -30,6 +31,7 @@ def health_check():
     return "Telegram Crypto Bot is running! (Bybit WebSocket)", 200
 
 # ==================== COMMAND HANDLERS ====================
+# ... (giữ nguyên tất cả các hàm handler của bạn) ...
 
 def start_command(update: Update, context: CallbackContext):
     welcome_message = """
@@ -77,7 +79,6 @@ def help_command(update: Update, context: CallbackContext):
     update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
 
 def xiaofa_command(update: Update, context: CallbackContext):
-    """Lệnh /xiaofa - lấy giá coin"""
     if not context.args:
         update.message.reply_text("❌ Vui lòng nhập tên coin.\nVí dụ: /xiaofa BTC")
         return
@@ -107,7 +108,6 @@ def xiaofa_command(update: Update, context: CallbackContext):
         update.message.reply_text(f"❌ Không tìm thấy coin *{symbol}*", parse_mode=ParseMode.MARKDOWN)
 
 def prices_command(update: Update, context: CallbackContext):
-    """Lệnh /prices - xem giá nhiều coin"""
     watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy())
     update.message.reply_text("🔄 Đang lấy giá từ Bybit...")
     
@@ -127,7 +127,6 @@ def prices_command(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Không thể lấy giá")
 
 def market_command(update: Update, context: CallbackContext):
-    """Lệnh /market - tổng quan thị trường"""
     update.message.reply_text("🌍 Đang lấy dữ liệu thị trường...")
     
     btc_data = bybit_ws.get_price('BTC')
@@ -148,7 +147,6 @@ def market_command(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Không thể lấy dữ liệu")
 
 def add_command(update: Update, context: CallbackContext):
-    """Thêm coin theo dõi"""
     if not context.args:
         update.message.reply_text("❌ Ví dụ: /add DOGE")
         return
@@ -169,7 +167,6 @@ def add_command(update: Update, context: CallbackContext):
             update.message.reply_text(f"❌ Không tìm thấy *{symbol}*", parse_mode=ParseMode.MARKDOWN)
 
 def remove_command(update: Update, context: CallbackContext):
-    """Xóa coin theo dõi"""
     if not context.args:
         update.message.reply_text("❌ Ví dụ: /remove DOGE")
         return
@@ -186,7 +183,6 @@ def remove_command(update: Update, context: CallbackContext):
         update.message.reply_text(f"❌ Không tìm thấy *{symbol}*", parse_mode=ParseMode.MARKDOWN)
 
 def list_command(update: Update, context: CallbackContext):
-    """Danh sách coin theo dõi"""
     watchlist = context.user_data.get('watchlist', DEFAULT_COINS.copy())
     
     if watchlist:
@@ -204,7 +200,6 @@ def list_command(update: Update, context: CallbackContext):
         update.message.reply_text("📋 Danh sách trống")
 
 def error_handler(update: Update, context: CallbackContext):
-    """Xử lý lỗi"""
     logger.error(f"Error: {context.error}")
     try:
         if update and update.message:
@@ -215,7 +210,6 @@ def error_handler(update: Update, context: CallbackContext):
 # ==================== JOB FUNCTIONS ====================
 
 def periodic_price_update(context: CallbackContext):
-    """Cập nhật giá định kỳ"""
     logger.info("📊 Đang gửi cập nhật giá...")
     coins_data = bybit_ws.get_multiple_prices(DEFAULT_COINS)
     
@@ -247,10 +241,9 @@ def main():
     updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
     
-    # ĐỔI /price THÀNH /xiaofa Ở ĐÂY!
     dp.add_handler(CommandHandler('start', start_command))
     dp.add_handler(CommandHandler('help', help_command))
-    dp.add_handler(CommandHandler('xiaofa', xiaofa_command))  # <<< ĐÃ ĐỔI
+    dp.add_handler(CommandHandler('xiaofa', xiaofa_command))
     dp.add_handler(CommandHandler('prices', prices_command))
     dp.add_handler(CommandHandler('market', market_command))
     dp.add_handler(CommandHandler('add', add_command))
@@ -266,9 +259,13 @@ def main():
             first=10
         )
     
-    updater.start_polling()
+    # FIX CHO RENDER
+    updater.start_polling(timeout=30, poll_interval=1.0)
     logger.info("🤖 Bot đã khởi động! Dùng /xiaofa để kiểm tra giá")
-    updater.idle()
+    
+    # 👉 WHILE TRUE PHẢI Ở TRONG HÀM MAIN
+    while True:
+        time.sleep(10)
 
 if __name__ == '__main__':
     flask_thread = threading.Thread(target=run_flask)
