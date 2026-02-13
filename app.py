@@ -225,9 +225,9 @@ async def periodic_price_update(context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== TELEGRAM BOT ====================
 def run_bot():
-    """Chạy Telegram bot với python-telegram-bot v20+"""
+    """Chạy Telegram bot - KHÔNG DÙNG UPDATER"""
     try:
-        # Tạo application - KHÔNG DÙNG UPDATER
+        # CHỈ DÙNG ApplicationBuilder - KHÔNG CÓ UPDATER
         application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
         
         # Add handlers
@@ -266,5 +266,5 @@ if __name__ == '__main__':
     flask_process.start()
     logger.info("✅ Flask server đã khởi động")
     
-    # Chạy bot trong process chính
+    # Chạy bot
     run_bot()
